@@ -340,7 +340,7 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
         ),
         y2="Min/km p90:Q",
     )
-    pace_line = pace_base.mark_line(point=True, color="#000000", size=3).encode(
+    pace_line = pace_base.mark_line(point=alt.OverlayMarkDef(color="#000000"), color="#000000", size=3).encode(
         y=alt.Y(
             "Min/km mediana valor:Q",
             title="Ritmo tramo (min/km)",
