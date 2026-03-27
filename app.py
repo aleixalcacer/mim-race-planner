@@ -331,20 +331,20 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
             alt.Tooltip("Tiempo tramo:N", title="Tiempo tramo"),
         ],
     )
-    pace_band = pace_base.mark_area(opacity=0.1, color="#1f77b4").encode(
+    pace_band = pace_base.mark_area(opacity=0.1, color="#000000").encode(
         y=alt.Y(
             "Min/km p10:Q",
             title="Ritmo tramo (min/km)",
-            axis=alt.Axis(titleColor="#1f77b4"),
+            axis=alt.Axis(titleColor="#000000"),
             scale=alt.Scale(domain=pace_domain[::-1], zero=False, nice=False),
         ),
         y2="Min/km p90:Q",
     )
-    pace_line = pace_base.mark_line(point=True, color="#1f77b4", size=3).encode(
+    pace_line = pace_base.mark_line(point=True, color="#000000", size=3).encode(
         y=alt.Y(
             "Min/km mediana valor:Q",
             title="Ritmo tramo (min/km)",
-            axis=alt.Axis(titleColor="#1f77b4"),
+            axis=alt.Axis(titleColor="#000000"),
             scale=alt.Scale(domain=pace_domain[::-1], zero=False, nice=False),
         ),
     )
@@ -357,13 +357,13 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
             alt.Tooltip("Hora paso:N", title="Hora paso"),
         ],
     )
-    control_vlines = control_base.mark_rule(opacity=1, color="#81b290").encode(
+    control_vlines = control_base.mark_rule(opacity=1, color="#e63946").encode(
         y=alt.datum(0, axis=None),
         y2=alt.datum(1),
         size=alt.SizeValue(7),
     )
     control_labels = control_base.mark_text(
-        angle=270, align="left", dx=10, color="#1b7f3a", fontWeight="bold"
+        angle=270, align="left", dx=10, color="#c0001a", fontWeight="bold"
     ).encode(
         y=alt.datum(1, axis=None),
         text="Control:N",
@@ -380,12 +380,12 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
             x=alt.X("X km:Q", title="Distancia acumulada (km)", scale=alt.Scale(domainMin=0)),
             tooltip=[],
         )
-        .mark_area(opacity=0.20, color="#2ca02c")
+        .mark_area(opacity=0.20, color="#e63946")
         .encode(
             y=alt.Y(
                 "Elevación m:Q",
                 title="Elevación (m)",
-                axis=alt.Axis(orient="right", titleColor="#2ca02c"),
+                axis=alt.Axis(orient="right", titleColor="#e63946"),
             ),
         )
     )
