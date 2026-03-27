@@ -362,7 +362,9 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
         y2=alt.datum(1),
         size=alt.SizeValue(7),
     )
-    control_labels = control_base.mark_text(dy=-10, color="#1b7f3a", fontWeight="bold").encode(
+    control_labels = control_base.mark_text(
+        angle=270, align="left", dx=10, color="#1b7f3a", fontWeight="bold"
+    ).encode(
         y=alt.datum(1, axis=None),
         text="Control:N",
     )
