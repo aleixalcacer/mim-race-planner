@@ -331,20 +331,20 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
             alt.Tooltip("Tiempo tramo:N", title="Tiempo tramo"),
         ],
     )
-    pace_band = pace_base.mark_area(opacity=0.1, color="#000000").encode(
+    pace_band = pace_base.mark_area(opacity=0.1, color="#8b0000").encode(
         y=alt.Y(
             "Min/km p10:Q",
             title="Ritmo tramo (min/km)",
-            axis=alt.Axis(titleColor="#000000"),
+            axis=alt.Axis(titleColor="#8b0000"),
             scale=alt.Scale(domain=pace_domain[::-1], zero=False, nice=False),
         ),
         y2="Min/km p90:Q",
     )
-    pace_line = pace_base.mark_line(point=alt.OverlayMarkDef(color="#000000"), color="#000000", size=3).encode(
+    pace_line = pace_base.mark_line(point=alt.OverlayMarkDef(color="#8b0000"), color="#8b0000", size=3).encode(
         y=alt.Y(
             "Min/km mediana valor:Q",
             title="Ritmo tramo (min/km)",
-            axis=alt.Axis(titleColor="#000000"),
+            axis=alt.Axis(titleColor="#8b0000"),
             scale=alt.Scale(domain=pace_domain[::-1], zero=False, nice=False),
         ),
     )
