@@ -442,7 +442,8 @@ def main() -> None:
     st.subheader("🗺️ Tu estrategia de carrera")
     st.caption(
         f"Visualiza tu plan con el perfil de elevación y el ritmo recomendado por tramo. "
-        f"Datos basados en los {N_PEER_RUNNERS} corredores más cercanos a tu objetivo."
+        f"Datos basados en los {N_PEER_RUNNERS} corredores más cercanos a tu objetivo. "
+        f"Si pasas el cursor por cada tramo o control, verás información detallada sobre tiempos y ritmos."
     )
 
     try:
