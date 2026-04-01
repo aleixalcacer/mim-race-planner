@@ -262,9 +262,18 @@ def compute_plan(
 
     segment_pace_df = segment_elapsed_df.divide(plan.set_index("Control")["KM tramo"], axis=1)
     plan["Min/km mediana valor"] = plan["Control"].map(segment_pace_df.median(numeric_only=True))
-    plan["Min/km p10"] = plan["Control"].map(segment_pace_df.quantile(0.10, numeric_only=True))
-    plan["Min/km p90"] = plan["Control"].map(segment_pace_df.quantile(0.90, numeric_only=True))
     plan["Min/km tramo"] = plan["Min/km mediana valor"].apply(pace_to_text)
+
+    elapsed_p10 = estimated_elapsed_df.quantile(0.10, numeric_only=True)
+    elapsed_p90 = estimated_elapsed_df.quantile(0.90, numeric_only=True)
+    plan["Min acumulados p10"] = plan["Control"].map(elapsed_p10).round().astype("Int64")
+    plan["Min acumulados p90"] = plan["Control"].map(elapsed_p90).round().astype("Int64")
+    plan["Tiempo paso p10"] = plan["Min acumulados p10"].apply(
+        lambda m: f"{m // 60:02d}:{m % 60:02d}" if pd.notna(m) else ""
+    )
+    plan["Tiempo paso p90"] = plan["Min acumulados p90"].apply(
+        lambda m: f"{m // 60:02d}:{m % 60:02d}" if pd.notna(m) else ""
+    )
 
     plan["Control anterior"] = plan["Control"].shift(1).fillna("Salida")
     plan["Tramo"] = plan["Control anterior"] + " - " + plan["Control"]
@@ -280,22 +289,28 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
     chart_df = plan[
         [
             "Control", "Control anterior", "Tramo", "Tiempo tramo", "Min/km tramo",
-            "KM", "KM tramo", "Min/km mediana valor", "Min/km p10", "Min/km p90",
-            "D+", "Hora paso",
+            "KM", "KM tramo", "Min/km mediana valor",
+            "D+", "Hora paso", "Tiempo acumulado", "Tiempo paso p10", "Tiempo paso p90",
+            "Min acumulados", "Min acumulados p10", "Min acumulados p90",
         ]
     ].copy()
 
     start_row = pd.DataFrame([{
         "Control": "Salida", "Control anterior": pd.NA, "Tramo": pd.NA,
         "Tiempo tramo": pd.NA, "Min/km tramo": pd.NA, "KM": 0.0, "KM tramo": pd.NA,
-        "Min/km mediana valor": pd.NA, "Min/km p10": pd.NA, "Min/km p90": pd.NA,
-        "D+": pd.NA, "Hora paso": START_TIME_STR,
+        "Min/km mediana valor": pd.NA,
+        "D+": pd.NA, "Hora paso": START_TIME_STR, "Tiempo acumulado": "00:00",
+        "Tiempo paso p10": "00:00", "Tiempo paso p90": "00:00",
+        "Min acumulados": 0, "Min acumulados p10": 0, "Min acumulados p90": 0,
     }])
     chart_df = pd.concat([start_row, chart_df], ignore_index=True)
     chart_df = chart_df.sort_values("KM").reset_index(drop=True)
 
     control_markers_df = (
-        chart_df[["Control", "KM", "D+", "Hora paso"]]
+        chart_df[[
+            "Control", "KM", "D+", "Hora paso", "Tiempo acumulado", "Tiempo paso p10", "Tiempo paso p90",
+            "Min acumulados", "Min acumulados p10", "Min acumulados p90",
+        ]]
         .dropna(subset=["KM", "Hora paso"])
         .drop_duplicates()
         .copy()
@@ -306,56 +321,57 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
             [
                 pd.DataFrame([{
                     "Control": "Salida", "KM": 0.0, "D+": 0.0,
-                    "X km": 0.0, "Hora paso": START_TIME_STR,
+                    "X km": 0.0, "Hora paso": START_TIME_STR, "Tiempo acumulado": "00:00",
+                    "Tiempo paso p10": "00:00", "Tiempo paso p90": "00:00",
+                    "Min acumulados": 0, "Min acumulados p10": 0, "Min acumulados p90": 0,
                 }]),
                 control_markers_df,
             ],
             ignore_index=True,
         )
 
-    pace_df = chart_df.dropna(subset=["Min/km mediana valor", "Min/km p10", "Min/km p90"]).copy()
-    pace_df["X km"] = pace_df["KM"] - (pace_df["KM tramo"] / 2)
+    time_min = int(control_markers_df["Min acumulados p10"].min())
+    time_max = int(control_markers_df["Min acumulados p90"].max())
+    time_span = max(time_max - time_min, 5)
+    time_padding = time_span * 0.05
+    time_domain = [max(0, time_min - time_padding), time_max + time_padding]
+    time_axis = alt.Axis(
+        titleColor="#8b0000",
+        labelExpr="floor(datum.value / 60) + 'h ' + (datum.value % 60 < 10 ? '0' : '') + (datum.value % 60) + 'm'",
+    )
 
-    pace_min = float(pace_df["Min/km p10"].min())
-    pace_max = float(pace_df["Min/km p90"].max())
-    pace_span = max(pace_max - pace_min, 0.2)
-    pace_padding = pace_span * 0.08
-    pace_domain = [pace_min - pace_padding, pace_max + pace_padding]
-
-    pace_base = alt.Chart(pace_df).encode(
+    time_base = alt.Chart(control_markers_df).encode(
         x=alt.X("X km:Q", title="Distancia acumulada (km)", scale=alt.Scale(domainMin=0)),
         tooltip=[
-            alt.Tooltip("Tramo:N", title="Tramo"),
-            alt.Tooltip("KM tramo:Q", title="Distancia", format=".1f"),
-            alt.Tooltip("Min/km tramo:N", title="Ritmo medio"),
-            alt.Tooltip("Tiempo tramo:N", title="Tiempo tramo"),
+            alt.Tooltip("Control:N", title="Control"),
+            alt.Tooltip("KM:Q", title="KM", format=".1f"),
+            alt.Tooltip("Tiempo acumulado:N", title="Tiempo de paso"),
+            alt.Tooltip("Tiempo paso p10:N", title="Tiempo paso p10"),
+            alt.Tooltip("Tiempo paso p90:N", title="Tiempo paso p90"),
+            alt.Tooltip("Hora paso:N", title="Hora paso"),
         ],
     )
-    pace_band = pace_base.mark_area(opacity=0.1, color="#8b0000").encode(
+    time_band = time_base.mark_area(opacity=0.15, color="#8b0000").encode(
         y=alt.Y(
-            "Min/km p10:Q",
-            title="Ritmo tramo (min/km)",
-            axis=alt.Axis(titleColor="#8b0000"),
-            scale=alt.Scale(domain=pace_domain[::-1], zero=False, nice=False),
+            "Min acumulados p10:Q",
+            title="Tiempo de paso",
+            axis=time_axis,
+            scale=alt.Scale(domain=time_domain, zero=False, nice=False),
         ),
-        y2="Min/km p90:Q",
+        y2="Min acumulados p90:Q",
     )
-    pace_line = pace_base.mark_line(point=alt.OverlayMarkDef(color="#8b0000"), color="#8b0000", size=3).encode(
+    time_line = time_base.mark_line(point=alt.OverlayMarkDef(color="#8b0000"), color="#8b0000", size=3).encode(
         y=alt.Y(
-            "Min/km mediana valor:Q",
-            title="Ritmo tramo (min/km)",
-            axis=alt.Axis(titleColor="#8b0000"),
-            scale=alt.Scale(domain=pace_domain[::-1], zero=False, nice=False),
+            "Min acumulados:Q",
+            title="Tiempo de paso",
+            axis=time_axis,
+            scale=alt.Scale(domain=time_domain, zero=False, nice=False),
         ),
     )
 
     control_base = alt.Chart(control_markers_df).encode(
         x=alt.X("X km:Q"),
-        tooltip=[
-            alt.Tooltip("Control:N", title="Control"),
-            alt.Tooltip("KM:Q", title="KM", format=".1f"),
-            alt.Tooltip("Hora paso:N", title="Hora paso"),
-        ],
+        tooltip=[],
     )
     control_vlines = control_base.mark_rule(opacity=1, color="#e63946").encode(
         y=alt.datum(0, axis=None),
@@ -370,7 +386,7 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
     )
 
     if gpx_profile_df.empty:
-        return (control_vlines + pace_band + pace_line).resolve_scale(y="independent")
+        return (control_vlines + time_band + time_line).resolve_scale(y="independent")
 
     gpx_df = gpx_profile_df.copy()
     gpx_df["X km"] = gpx_df["Distancia km"]
@@ -390,7 +406,7 @@ def build_chart(plan: pd.DataFrame, gpx_profile_df: pd.DataFrame) -> alt.Chart:
         )
     )
 
-    return (gpx_area + control_vlines + control_labels + pace_line + pace_band).resolve_scale(
+    return (gpx_area + control_vlines + control_labels + time_band + time_line).resolve_scale(
         y="independent"
     )
 
@@ -463,16 +479,14 @@ def main() -> None:
     with st.expander("📊 Desglose detallado por tramo"):
         export_df = plan[
             [
-                "Tramo", "KM", "D+", "Hora paso", "Tiempo acumulado",
-                "KM tramo", "d+", "Tiempo tramo", "Min/km tramo", "Min/km p10", "Min/km p90",
+                "Control", "KM", "D+", "Hora paso", "Tiempo acumulado",
+                "Min/km tramo", "Tiempo paso p10", "Tiempo paso p90",
             ]
         ].copy()
         export_df.columns = [
-            "Tramo", "KM Acumulado", "D+ Acumulado", "Hora de Paso", "Tiempo Acumulado",
-            "KM Tramo", "D+ Tramo", "Tiempo Tramo", "Ritmo (min/km)", "Ritmo p10", "Ritmo p90",
+            "Control", "KM Acumulado", "D+ Acumulado", "Hora de Paso", "Tiempo de Paso",
+            "Ritmo (min/km)", "Tiempo paso p10", "Tiempo paso p90",
         ]
-        export_df["Ritmo p10"] = export_df["Ritmo p10"].apply(pace_to_text)
-        export_df["Ritmo p90"] = export_df["Ritmo p90"].apply(pace_to_text)
 
         st.dataframe(
             export_df,
@@ -480,12 +494,10 @@ def main() -> None:
             hide_index=True,
             column_config={
                 "KM Acumulado": st.column_config.NumberColumn(format="%.1f km", label="Distancia"),
-                "KM Tramo": st.column_config.NumberColumn(format="%.1f km", label="Dist. Tramo"),
                 "D+ Acumulado": st.column_config.NumberColumn(format="%.0f m", label="Desnivel +"),
-                "D+ Tramo": st.column_config.NumberColumn(format="%.0f m", label="D+ Tramo"),
                 "Ritmo (min/km)": st.column_config.TextColumn(),
-                "Ritmo p10": st.column_config.TextColumn(),
-                "Ritmo p90": st.column_config.TextColumn(),
+                "Tiempo paso p10": st.column_config.TextColumn(),
+                "Tiempo paso p90": st.column_config.TextColumn(),
             },
         )
 
